@@ -1,0 +1,12 @@
+
+declare tellActorName @ MSG_TELLACTORNAME = 8
+  actor_id  : uint{16}
+  x         : fixed{8.8}
+  y         : fixed{bits:4.8}
+  hp_mp_xp  : percent{bits: 7}
+  z         : float
+  nav       : enum{bits:3} Navigability
+  blobby    : blob{bytes:BLOB_BYTES=16}
+  copyit    : struct FooStruct 
+  packit    : struct{pack} FooStruct 
+end

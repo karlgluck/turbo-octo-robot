@@ -1,0 +1,66 @@
+Simple Types
+===
+
+name      base type     encoded as      parameter(s)         Decl                   Description
+---------------------------------------------------------------------------------------------------------------
+int       int           bits            bits:[1,32]          int{bits:8}
+uint      unsigned int  bits            bits:[1,32]          uint{bits:8}
+fixed     float         bits            bits:[0,32][0,32]    fixed{bits:4.4}              First range is whole, second is fraction. Can use '0' for either but not both. Sum cannot exceed 32.
+percent   float         bits            bits:[1,32]          percent{bits:8}              Different from 'fixed(0.X)' because it encodes [0,1] in X bits vs. [0,1) in X bits.
+enum      Name          bits            bits:[1,32]          enum{bits:6} Name            Enum values are assumed to be always unsigned
+float     float         float           -                    float                        Direct copy of 32 bits
+double    double        double          -                    double                       Direct copy of 64 bits
+blob      void*         bytes           symbol, bytes        blob{bytes:NUM_BYTES=8}      Data of some constant size
+struct    Name          bytes           type                 struct Name                  Copies a struct into the buffer. Can optionally specify struct{copy} to be explicit.
+struct    Name          bytes           type                 struct{pack} Name            Invokes pack<Name> to pack the struct into the buffer. Expected bytes per struct <= packable<Name>::kMaxBytes
+
+
+Complex Types
+===
+
+name      base type     encoded as      parameter(s)         Decl                   Description
+---------------------------------------------------------------------------------------------------------------
+string    char*         bytes           symbol, max length   string{length:MAX_STR=32}    Will automatically append \0 to decoded string. Length does not include \0.
+buffer    void*         bytes           symbol, max bytes    buffer[limit:MAX_BYTES=12]   Some bytes of indeterminate size
+array     ~             bytes           type, symbol, max    array[limit:MAX=16] *        Followed by a Simple Type *. Will pack built-in types < 32 bits at bit resolution if it can save more than 4 bytes.
+payload   ~             bytes           type, symbol, max    payload[limit:MAX=32] *      Same as 'array', but will just pack as much as possible in a message then invoke encode callback. 
+
+
+param max_bytes_per_packet = 512
+
+declare itemsOnLocation @ MSG_ITEMS_ONLOCATION = 12
+  x     : fixed{bits:7.3}
+  y     : fixed{bits:7.3}
+  items : array uint{12}[length:MAX_ITEMS_PER_LOCATION=24]
+  items : payload blob{bytes:14}[MAX_ITEMS=14]
+
+declare somethingSomethingSomething @ ITS_A_MESSAGE = 15
+  x     : fixed{7.3}
+  y     : fixed{7.3}
+  z     : double
+  chat  : string{MAX_CHAT_LENGTH=128}
+  p     : enum{4} SomethingType
+  foo   : struct{pack} Item
+  bar   : payload[MAX_ITEMS_PER_LOCATION = 30] struct{pack} Item
+  slow_sync_data : payload{pack} SlowSyncData
+
+
+
+template <unsigned int kWholeBits, unsigned int kFractBits, typename Float> unsigned int packFloat(Float f) {
+  int retval = (int)(f * Float(1 << (kFractBits)));
+  return *(unsigned int*)&retval;
+}
+
+template <unsigned int kWholeBits, unsigned int kFractBits, typename Float> Float unpackFloat(unsigned int f) {
+  f <<= 32 - (kWholeBits+kFractBits);     // lsh to put number in high bits
+  int intval = *(int*)(&f);         // reinterpret bits as a signed int
+  intval >>= 32 - (kWholeBits+kFractBits);   // right shift back down with arithmetic sign extension
+  return intval / Float(1 << (kFractBits));  // convert back to floating point
+}
+
+template <typename T> int pack(const T* array, size_t remaining, const char *buffer_in, const char *buffer_end, const char **buffer_out);
+
+messages
+first 3 bits is a code specifier
+000 -> 2 bytes (less top 3 bits) of message to decode = 13 bits -> 8192 commands
+001 -> some sort of 
